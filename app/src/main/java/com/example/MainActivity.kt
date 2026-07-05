@@ -108,7 +108,15 @@ fun getLocalizedString(key: String, lang: String): String {
         "time_interval" to "Time Interval",
         "test_play" to "Test Play",
         "spoken_success" to "Successfully spoken",
-        "spoken_failure" to "Failed"
+        "spoken_failure" to "Failed",
+        "volume" to "Speech Volume",
+        "volume_desc" to "Loudness of hindi speech",
+        "schedule" to "Work Timestamp Limit",
+        "schedule_desc" to "Only speaks during set time limit",
+        "start_time" to "Start Time",
+        "end_time" to "End Time",
+        "schedule_active" to "Timestamp Limit Enabled",
+        "schedule_inactive" to "Active 24/7"
     )
 
     val hi = mapOf(
@@ -143,10 +151,27 @@ fun getLocalizedString(key: String, lang: String): String {
         "time_interval" to "समय अंतराल",
         "test_play" to "टेस्ट प्ले",
         "spoken_success" to "सफलतापूर्वक बोला गया",
-        "spoken_failure" to "विफलता"
+        "spoken_failure" to "विफलता",
+        "volume" to "आवाज का स्तर",
+        "volume_desc" to "हिंदी भाषण की तीव्रता",
+        "schedule" to "कार्य समय सीमा",
+        "schedule_desc" to "केवल निर्धारित समय में बोलना सीमित करें",
+        "start_time" to "प्रारंभ समय",
+        "end_time" to "समाप्ति समय",
+        "schedule_active" to "समय सीमा सक्रिय है",
+        "schedule_inactive" to "24/7 सक्रिय"
     )
 
     return if (lang == "hi") hi[key] ?: en[key] ?: key else en[key] ?: key
+}
+
+fun formatTimeAmPm(hour: Int, minute: Int): String {
+    val cal = Calendar.getInstance().apply {
+        set(Calendar.HOUR_OF_DAY, hour)
+        set(Calendar.MINUTE, minute)
+    }
+    val sdf = SimpleDateFormat("hh:mm a", Locale.getDefault())
+    return sdf.format(cal.time)
 }
 
 @Composable
@@ -186,6 +211,12 @@ fun SpeakingClockScreen(
     val intervalMinutes by viewModel.intervalMinutes.collectAsStateWithLifecycle()
     val speechRate by viewModel.speechRate.collectAsStateWithLifecycle()
     val speechPitch by viewModel.speechPitch.collectAsStateWithLifecycle()
+    val speechVolume by viewModel.speechVolume.collectAsStateWithLifecycle()
+    val scheduleEnabled by viewModel.scheduleEnabled.collectAsStateWithLifecycle()
+    val scheduleStartHour by viewModel.scheduleStartHour.collectAsStateWithLifecycle()
+    val scheduleStartMinute by viewModel.scheduleStartMinute.collectAsStateWithLifecycle()
+    val scheduleEndHour by viewModel.scheduleEndHour.collectAsStateWithLifecycle()
+    val scheduleEndMinute by viewModel.scheduleEndMinute.collectAsStateWithLifecycle()
     val selectedVoiceName by viewModel.selectedVoiceName.collectAsStateWithLifecycle()
     val availableVoices by viewModel.availableVoices.collectAsStateWithLifecycle()
     val historyLogs by viewModel.historyLogs.collectAsStateWithLifecycle()
@@ -558,6 +589,172 @@ fun SpeakingClockScreen(
             }
         }
 
+        // --- BENTO GRID TILE 3.5: Active Schedule / Timestamp Limits (col-span-2) ---
+        item {
+            val startLabel = formatTimeAmPm(scheduleStartHour, scheduleStartMinute)
+            val endLabel = formatTimeAmPm(scheduleEndHour, scheduleEndMinute)
+            
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = if (scheduleEnabled) MaterialTheme.colorScheme.surfaceVariant
+                                    else MaterialTheme.colorScheme.surface
+                ),
+                shape = RoundedCornerShape(28.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("schedule_card")
+            ) {
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.AccessTime,
+                                    contentDescription = "Active schedule timer",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Column {
+                                Text(
+                                    text = getLocalizedString("schedule", uiLanguage),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = getLocalizedString("schedule_desc", uiLanguage),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.secondary
+                                )
+                            }
+                        }
+                        
+                        // Active Schedule Toggle Switch
+                        Switch(
+                            checked = scheduleEnabled,
+                            onCheckedChange = { viewModel.updateScheduleEnabled(context, it) },
+                            modifier = Modifier.testTag("schedule_toggle")
+                        )
+                    }
+
+                    if (scheduleEnabled) {
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            // Start Time Selector
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.7f))
+                                    .clickable {
+                                        val timePickerDialog = android.app.TimePickerDialog(
+                                            context,
+                                            { _, h, m -> viewModel.updateScheduleStartTime(context, h, m) },
+                                            scheduleStartHour,
+                                            scheduleStartMinute,
+                                            false
+                                        )
+                                        timePickerDialog.show()
+                                    }
+                                    .padding(12.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = getLocalizedString("start_time", uiLanguage),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.secondary,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = startLabel,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+
+                            // End Time Selector
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.7f))
+                                    .clickable {
+                                        val timePickerDialog = android.app.TimePickerDialog(
+                                            context,
+                                            { _, h, m -> viewModel.updateScheduleEndTime(context, h, m) },
+                                            scheduleEndHour,
+                                            scheduleEndMinute,
+                                            false
+                                        )
+                                        timePickerDialog.show()
+                                    }
+                                    .padding(12.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = getLocalizedString("end_time", uiLanguage),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.secondary,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = endLabel,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+
+                        // Informational Status text
+                        Text(
+                            text = "${getLocalizedString("schedule_active", uiLanguage)}: $startLabel - $endLabel",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = TextAlign.Center
+                        )
+                    } else {
+                        Text(
+                            text = getLocalizedString("schedule_inactive", uiLanguage),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.7f),
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            }
+        }
+
         // --- BENTO GRID TILE 4: Hindi Voice Engine Control (col-span-2) ---
         item {
             Card(
@@ -674,6 +871,46 @@ fun SpeakingClockScreen(
                             }
                         }
                     }
+
+                    // Volume Slider
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (speechVolume == 0f) Icons.Default.VolumeMute else if (speechVolume < 0.5f) Icons.Default.VolumeDown else Icons.Default.VolumeUp,
+                                    contentDescription = "Volume icon",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    text = getLocalizedString("volume", uiLanguage),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Text(
+                                text = String.format("%d%%", (speechVolume * 100).toInt()),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Slider(
+                            value = speechVolume,
+                            onValueChange = { viewModel.updateSpeechVolume(context, it) },
+                            valueRange = 0f..1f,
+                            modifier = Modifier.testTag("speech_volume_slider")
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
 
                     // Pitch & Speech Rate sliders
                     Row(

@@ -167,6 +167,31 @@ class SpeakingClockService : Service(), TextToSpeech.OnInitListener {
         }
     }
 
+    private fun isWithinActiveHours(): Boolean {
+        val enabled = sharedPrefs.getBoolean("schedule_enabled", false)
+        if (!enabled) return true
+
+        val startHour = sharedPrefs.getInt("schedule_start_hour", 8)
+        val startMinute = sharedPrefs.getInt("schedule_start_minute", 0)
+        val endHour = sharedPrefs.getInt("schedule_end_hour", 22)
+        val endMinute = sharedPrefs.getInt("schedule_end_minute", 0)
+
+        val calendar = Calendar.getInstance()
+        val currentHour = calendar.get(Calendar.HOUR_OF_DAY)
+        val currentMinute = calendar.get(Calendar.MINUTE)
+
+        val currentTimeInMinutes = currentHour * 60 + currentMinute
+        val startTimeInMinutes = startHour * 60 + startMinute
+        val endTimeInMinutes = endHour * 60 + endMinute
+
+        return if (startTimeInMinutes <= endTimeInMinutes) {
+            currentTimeInMinutes in startTimeInMinutes..endTimeInMinutes
+        } else {
+            // Spans across midnight (e.g. 22:00 to 06:00)
+            currentTimeInMinutes >= startTimeInMinutes || currentTimeInMinutes <= endTimeInMinutes
+        }
+    }
+
     private fun speakTime(triggerType: String) {
         if (!isTtsReady) {
             Log.e(TAG, "Cannot speak. TTS is not ready.")
@@ -174,9 +199,23 @@ class SpeakingClockService : Service(), TextToSpeech.OnInitListener {
             return
         }
 
+        // Only enforce schedule restriction for automatic triggers (SCREEN_WAKE, INTERVAL), not for manual "TEST" trigger
+        if (triggerType != "TEST" && !isWithinActiveHours()) {
+            Log.d(TAG, "Speech skipped: Outside of designated active timestamp hours.")
+            val startHour = sharedPrefs.getInt("schedule_start_hour", 8)
+            val startMinute = sharedPrefs.getInt("schedule_start_minute", 0)
+            val endHour = sharedPrefs.getInt("schedule_end_hour", 22)
+            val endMinute = sharedPrefs.getInt("schedule_end_minute", 0)
+            val scheduleStr = String.format("%02d:%02d - %02d:%02d", startHour, startMinute, endHour, endMinute)
+            saveLogToDatabase(TimeFormatter.getCurrentTimeInHindi(), triggerType, "SKIPPED (Outside $scheduleStr)")
+            return
+        }
+
         val text = TimeFormatter.getCurrentTimeInHindi()
+        val volume = sharedPrefs.getFloat("speech_volume", 1.0f)
         val params = Bundle().apply {
             putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, "SpeakingClockId_${System.currentTimeMillis()}")
+            putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, volume)
         }
 
         val result = tts.speak(text, TextToSpeech.QUEUE_FLUSH, params, params.getString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID))

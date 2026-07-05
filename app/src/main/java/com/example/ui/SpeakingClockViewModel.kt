@@ -36,6 +36,24 @@ class SpeakingClockViewModel(application: Application) : AndroidViewModel(applic
     private val _speechPitch = MutableStateFlow(1.0f)
     val speechPitch: StateFlow<Float> = _speechPitch.asStateFlow()
 
+    private val _speechVolume = MutableStateFlow(1.0f)
+    val speechVolume: StateFlow<Float> = _speechVolume.asStateFlow()
+
+    private val _scheduleEnabled = MutableStateFlow(false)
+    val scheduleEnabled: StateFlow<Boolean> = _scheduleEnabled.asStateFlow()
+
+    private val _scheduleStartHour = MutableStateFlow(8)
+    val scheduleStartHour: StateFlow<Int> = _scheduleStartHour.asStateFlow()
+
+    private val _scheduleStartMinute = MutableStateFlow(0)
+    val scheduleStartMinute: StateFlow<Int> = _scheduleStartMinute.asStateFlow()
+
+    private val _scheduleEndHour = MutableStateFlow(22)
+    val scheduleEndHour: StateFlow<Int> = _scheduleEndHour.asStateFlow()
+
+    private val _scheduleEndMinute = MutableStateFlow(0)
+    val scheduleEndMinute: StateFlow<Int> = _scheduleEndMinute.asStateFlow()
+
     private val _selectedVoiceName = MutableStateFlow("")
     val selectedVoiceName: StateFlow<String> = _selectedVoiceName.asStateFlow()
 
@@ -65,6 +83,12 @@ class SpeakingClockViewModel(application: Application) : AndroidViewModel(applic
         _intervalMinutes.value = sharedPrefs.getInt("interval_minutes", 0)
         _speechRate.value = sharedPrefs.getFloat("speech_rate", 1.0f)
         _speechPitch.value = sharedPrefs.getFloat("speech_pitch", 1.0f)
+        _speechVolume.value = sharedPrefs.getFloat("speech_volume", 1.0f)
+        _scheduleEnabled.value = sharedPrefs.getBoolean("schedule_enabled", false)
+        _scheduleStartHour.value = sharedPrefs.getInt("schedule_start_hour", 8)
+        _scheduleStartMinute.value = sharedPrefs.getInt("schedule_start_minute", 0)
+        _scheduleEndHour.value = sharedPrefs.getInt("schedule_end_hour", 22)
+        _scheduleEndMinute.value = sharedPrefs.getInt("schedule_end_minute", 0)
         _selectedVoiceName.value = sharedPrefs.getString("selected_voice_name", "") ?: ""
         _uiLanguage.value = sharedPrefs.getString("ui_language", "en") ?: "en"
     }
@@ -122,6 +146,32 @@ class SpeakingClockViewModel(application: Application) : AndroidViewModel(applic
     fun updateSpeechPitch(context: Context, pitch: Float) {
         sharedPrefs.edit().putFloat("speech_pitch", pitch).apply()
         _speechPitch.value = pitch
+        notifyServiceUpdate(context)
+    }
+
+    fun updateSpeechVolume(context: Context, volume: Float) {
+        sharedPrefs.edit().putFloat("speech_volume", volume).apply()
+        _speechVolume.value = volume
+        notifyServiceUpdate(context)
+    }
+
+    fun updateScheduleEnabled(context: Context, enabled: Boolean) {
+        sharedPrefs.edit().putBoolean("schedule_enabled", enabled).apply()
+        _scheduleEnabled.value = enabled
+        notifyServiceUpdate(context)
+    }
+
+    fun updateScheduleStartTime(context: Context, hour: Int, minute: Int) {
+        sharedPrefs.edit().putInt("schedule_start_hour", hour).putInt("schedule_start_minute", minute).apply()
+        _scheduleStartHour.value = hour
+        _scheduleStartMinute.value = minute
+        notifyServiceUpdate(context)
+    }
+
+    fun updateScheduleEndTime(context: Context, hour: Int, minute: Int) {
+        sharedPrefs.edit().putInt("schedule_end_hour", hour).putInt("schedule_end_minute", minute).apply()
+        _scheduleEndHour.value = hour
+        _scheduleEndMinute.value = minute
         notifyServiceUpdate(context)
     }
 
