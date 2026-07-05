@@ -1,0 +1,6 @@
+{
+  "name": "VT - Hindi Speaking Time",
+  "description": "Speaks the current time in a female Hindi voice when you wake up your phone or at custom intervals without unlocking.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
